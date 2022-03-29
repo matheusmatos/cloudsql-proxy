@@ -16,6 +16,7 @@
 package tests
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"os"
@@ -52,6 +53,11 @@ func TestSqlServerTcp(t *testing.T) {
 	}
 	requireSqlserverVars(t)
 
+	ctx, _ := context.WithTimeout(context.Background(), connTestTimeout)
+
 	dsn := fmt.Sprintf("sqlserver://%s:%s@127.0.0.1?database=%s", *sqlserverUser, *sqlserverPass, *sqlserverDb)
-	proxyConnTest(t, *sqlserverConnName, "sqlserver", dsn, sqlserverPort, "")
+	proxyConnTest(t,
+		ctx,
+		[]string{*sqlserverConnName},
+		"sqlserver", dsn, sqlserverPort, "")
 }

@@ -16,6 +16,7 @@
 package tests
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"os"
@@ -23,6 +24,8 @@ import (
 
 	_ "github.com/GoogleCloudPlatform/cloudsql-proxy/v2/proxy/dialers/postgres"
 	_ "github.com/lib/pq"
+	"golang.org/x/oauth2/google"
+	"google.golang.org/api/sqladmin/v1"
 )
 
 var (
@@ -56,5 +59,55 @@ func TestPostgresTcp(t *testing.T) {
 	requirePostgresVars(t)
 
 	dsn := fmt.Sprintf("user=%s password=%s database=%s sslmode=disable", *postgresUser, *postgresPass, *postgresDb)
-	proxyConnTest(t, *postgresConnName, "postgres", dsn, postgresPort, "")
+	proxyConnTest(t, context.Background(), []string{*postgresConnName}, "postgres", dsn, postgresPort, "")
+}
+
+func TestAuthWithToken(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping Postgres integration tests")
+	}
+	requirePostgresVars(t)
+
+	ts, err := google.DefaultTokenSource(context.Background(), sqladmin.SqlserviceAdminScope)
+	if err != nil {
+		t.Errorf("failed to resolve token source: %v", err)
+	}
+	tok, err := ts.Token()
+	if err != nil {
+		t.Errorf("failed to get token: %v", err)
+	}
+
+	dsn := fmt.Sprintf("user=%s password=%s database=%s sslmode=disable",
+		*postgresUser, *postgresPass, *postgresDb)
+	proxyConnTest(t,
+		context.Background(),
+		[]string{"--token", tok.AccessToken, *postgresConnName},
+		"postgres", dsn, postgresPort, "")
+}
+
+func TestAuthWithCredentialsFile(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping Postgres integration tests")
+	}
+	requirePostgresVars(t)
+
+	path, ok := os.LookupEnv("GOOGLE_APPLICATION_CREDENTIALS")
+	if !ok {
+		t.Fatalf("GOOGLE_APPLICATION_CREDENTIALS was not set in the environment")
+	}
+	defer func() {
+		os.Setenv("GOOGLE_APPLICATION_CREDENTIALS", path)
+	}()
+	if err := os.Unsetenv("GOOGLE_APPLICATION_CREDENTIALS"); err != nil {
+		t.Fatalf("failed to unset GOOGLE_APPLICATION_CREDENTIALS")
+	}
+
+	ctx, _ := context.WithTimeout(context.Background(), connTestTimeout)
+
+	dsn := fmt.Sprintf("user=%s password=%s database=%s sslmode=disable",
+		*postgresUser, *postgresPass, *postgresDb)
+	proxyConnTest(t,
+		ctx,
+		[]string{"--credentials-file", path, *postgresConnName},
+		"postgres", dsn, postgresPort, "")
 }
