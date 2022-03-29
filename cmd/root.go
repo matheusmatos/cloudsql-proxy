@@ -81,6 +81,8 @@ any client SSL certificates.`,
 		"Bearer token used for authorization.")
 	cmd.PersistentFlags().StringVarP(&c.conf.CredentialsFile, "credentials-file", "c", "",
 		"Path to a service account key to use for authentication.")
+	cmd.PersistentFlags().BoolVarP(&c.conf.UseGcloudAuth, "use-gcloud-auth", "g", false,
+		"Use gcloud's config helper to retrieve a token for authentication.")
 
 	// Global and per instance flags
 	cmd.PersistentFlags().StringVarP(&c.conf.Addr, "address", "a", "127.0.0.1",
@@ -180,7 +182,12 @@ func runSignalWrapper(cmd *Command) error {
 	startCh := make(chan *proxy.Client)
 	go func() {
 		defer close(startCh)
-		d, err := cloudsqlconn.NewDialer(ctx, cmd.conf.DialerOpts()...)
+		opts, err := cmd.conf.DialerOpts()
+		if err != nil {
+			shutdownCh <- fmt.Errorf("error initializing dialer: %v", err)
+			return
+		}
+		d, err := cloudsqlconn.NewDialer(ctx, opts...)
 		if err != nil {
 			shutdownCh <- fmt.Errorf("error initializing dialer: %v", err)
 			return

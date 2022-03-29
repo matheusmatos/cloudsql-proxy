@@ -16,12 +16,16 @@
 package tests
 
 import (
+	"bytes"
 	"context"
 	"flag"
 	"fmt"
+	"io/ioutil"
 	"os"
+	"os/exec"
 	"testing"
 
+	"github.com/GoogleCloudPlatform/cloudsql-proxy/v2/internal/gcloud"
 	_ "github.com/GoogleCloudPlatform/cloudsql-proxy/v2/proxy/dialers/postgres"
 	_ "github.com/lib/pq"
 	"golang.org/x/oauth2/google"
@@ -109,5 +113,55 @@ func TestAuthWithCredentialsFile(t *testing.T) {
 	proxyConnTest(t,
 		ctx,
 		[]string{"--credentials-file", path, *postgresConnName},
+		"postgres", dsn, postgresPort, "")
+}
+
+func TestAuthWithGcloudAuth(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping Postgres integration tests")
+	}
+	requirePostgresVars(t)
+
+	// The following configures gcloud using only GOOGLE_APPLICATION_CREDENTIALS.
+	dir, err := ioutil.TempDir("", "cloudsdk*")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+	os.Setenv("CLOUDSDK_CONFIG", dir)
+	defer os.Unsetenv("CLOUDSDK_CONFIG")
+
+	gcloudCmd, err := gcloud.Cmd()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	keyFile, ok := os.LookupEnv("GOOGLE_APPLICATION_CREDENTIALS")
+	if !ok {
+		t.Fatal("GOOGLE_APPLICATION_CREDENTIALS is not set in the environment")
+	}
+	defer func() {
+		os.Setenv("GOOGLE_APPLICATION_CREDENTIALS", keyFile)
+	}()
+	if err := os.Unsetenv("GOOGLE_APPLICATION_CREDENTIALS"); err != nil {
+		t.Fatalf("failed to unset GOOGLE_APPLICATION_CREDENTIALS")
+	}
+
+	buf := &bytes.Buffer{}
+	cmd := exec.Command(gcloudCmd, "auth", "activate-service-account", "--key-file", keyFile)
+	cmd.Stdout = buf
+
+	if err := cmd.Run(); err != nil {
+		t.Fatalf("failed to active service account. err = %v, message = %v", err, buf.String())
+	}
+
+	// gcloud is configured, run the test
+
+	ctx, _ := context.WithTimeout(context.Background(), connTestTimeout)
+
+	dsn := fmt.Sprintf("user=%s password=%s database=%s sslmode=disable",
+		*postgresUser, *postgresPass, *postgresDb)
+	proxyConnTest(t,
+		ctx,
+		[]string{"--use-gcloud-auth", *postgresConnName},
 		"postgres", dsn, postgresPort, "")
 }

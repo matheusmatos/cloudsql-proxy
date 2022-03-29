@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"cloud.google.com/go/cloudsqlconn"
+	"github.com/GoogleCloudPlatform/cloudsql-proxy/v2/internal/gcloud"
 	"github.com/spf13/cobra"
 	"golang.org/x/oauth2"
 )
@@ -47,6 +48,10 @@ type Config struct {
 	// CredentialsFile is the path to a service account key.
 	CredentialsFile string
 
+	// UseGcloudAuth set whether to use Gcloud's config helper to retrieve a
+	// token for authentication.
+	UseGcloudAuth bool
+
 	// Addr is the address on which to bind all instances.
 	Addr string
 
@@ -59,7 +64,7 @@ type Config struct {
 	Instances []InstanceConnConfig
 }
 
-func (c Config) DialerOpts() []cloudsqlconn.Option {
+func (c Config) DialerOpts() ([]cloudsqlconn.Option, error) {
 	var opts []cloudsqlconn.Option
 	// The ordering in the switch statement is deliberate. When multiple auth
 	// values are configured, the precedence is:
@@ -75,8 +80,14 @@ func (c Config) DialerOpts() []cloudsqlconn.Option {
 		opts = append(opts, cloudsqlconn.WithCredentialsFile(
 			c.CredentialsFile,
 		))
+	case c.UseGcloudAuth:
+		ts, err := gcloud.GcloudTokenSource(context.Background())
+		if err != nil {
+			return nil, err
+		}
+		opts = append(opts, cloudsqlconn.WithTokenSource(ts))
 	}
-	return opts
+	return opts, nil
 }
 
 // Client represents the state of the current instantiation of the proxy.
