@@ -128,10 +128,10 @@ func NewClient(ctx context.Context, d cloudsql.Dialer, cmd *cobra.Command, conf 
 	var mnts []*socketMount
 	pc := newPortConfig(conf.Port)
 	for _, inst := range conf.Instances {
-		go func(i InstanceConnConfig) {
+		go func(name string) {
 			// Initiate refresh operation
-			d.EngineVersion(ctx, inst.Name)
-		}(inst)
+			d.EngineVersion(ctx, name)
+		}(inst.Name)
 	}
 	for _, inst := range conf.Instances {
 		m := &socketMount{inst: inst.Name}
