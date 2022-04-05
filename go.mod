@@ -3,7 +3,7 @@ module github.com/GoogleCloudPlatform/cloudsql-proxy/v2
 go 1.17
 
 require (
-	cloud.google.com/go/cloudsqlconn v0.2.1-0.20220317212813-c79136972083
+	cloud.google.com/go/cloudsqlconn v0.2.1-0.20220401153611-87e713b37755
 	cloud.google.com/go/compute v1.5.0
 	github.com/GoogleCloudPlatform/cloudsql-proxy v1.30.0
 	github.com/coreos/go-systemd/v22 v22.3.2
@@ -44,7 +44,7 @@ require (
 	golang.org/x/crypto v0.0.0-20210711020723-a769d52b0f97 // indirect
 	golang.org/x/text v0.3.7 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
-	google.golang.org/genproto v0.0.0-20220324131243-acbaeb5b85eb // indirect
+	google.golang.org/genproto v0.0.0-20220329172620-7be39ac1afc7 // indirect
 	google.golang.org/grpc v1.45.0 // indirect
-	google.golang.org/protobuf v1.27.1 // indirect
+	google.golang.org/protobuf v1.28.0 // indirect
 )
